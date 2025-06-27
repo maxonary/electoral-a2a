@@ -38,11 +38,25 @@ class Coordinator:
 
     def decide(self, task: str) -> str:
         tally: Dict[str, int] = {}
+        vote_detail: Dict[str, List[str]] = {}  # For evaluation
         for elector in self.electors:
             result = elector.conduct_state_vote(task)
             for proposal, weight in result.items():
                 tally[proposal] = tally.get(proposal, 0) + weight
+                vote_detail.setdefault(proposal, []).append(elector.state_name)
+
         winner = max(tally.items(), key=lambda x: x[1])[0]
+
+        # Evaluation Metrics
+        total_votes = sum(tally.values())
+        consensus_ratio = tally[winner] / total_votes if total_votes else 0
+        print("\n📊 Evaluation:")
+        print("Total electoral votes:", total_votes)
+        print("Winning proposal:", winner)
+        print("Votes received:", tally[winner])
+        print("States supporting:", vote_detail[winner])
+        print("Consensus ratio:", round(consensus_ratio, 2))
+
         return winner
 
 
