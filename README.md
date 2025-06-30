@@ -12,6 +12,10 @@ Many multi-agent systems rely on flat hierarchical designs. In the real-world, h
 Agents reason individually and cast votes. Electors aggregate group decisions. The Coordinator Agent collects electoral outcomes and executes final actions.
 
 ```mermaid
+---
+config:
+  theme: neo
+---
 graph TD
   subgraph "Agent Clusters (States)"
     A1["Agent A1 (Data)"] -->|votes| S1["State Elector 1 (5 votes)"]
