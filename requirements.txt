@@ -1,0 +1,2 @@
+openai>=1.23.0
+python-a2a>=0.5.4 
