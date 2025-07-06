@@ -1,6 +1,7 @@
-# Electoral RAG: Republic of Agents Governance
+# Electoral "RAG": Republic of Agents Governance
 
 A research prototype exploring governance-inspired coordination strategies in multi-agent AI systems.
+<img width="1121" alt="screenshot" src="https://github.com/user-attachments/assets/22f37a4d-5809-40db-8545-75395ca40d2a" />
 
 This project simulates a democratic decision-making process among LLM-based agents — modeled after the U.S. electoral system — to reason, vote, and act collaboratively on complex tasks. The system compares hierarchical, democratic, and electoral college-style approaches to evaluate performance, robustness, and interpretability in distributed agent environments.
 
@@ -82,6 +83,8 @@ You can also create a .env file and add your OpenAI API key to it.
 ## Running as an Agent-to-Agent (A2A) service
 
 The repository also ships with a minimal HTTP server that exposes the coordinator through [Google's Agent-to-Agent protocol](https://github.com/a2aproject/a2a-python). To start the service run:
+
+![Agent Card JSON Data](https://github.com/user-attachments/assets/f9566bed-46e6-4401-a2a9-f8bd81c6b307)
 
 ```bash
 python a2a_voting_server.py
