@@ -5,6 +5,12 @@ that conforms to Google's **Agent-to-Agent (A2A)** protocol.  Remote agents –
 or the `a2a` CLI – can then delegate arbitrary tasks and receive the winning
 agent's answer.
 
+Example
+-------
+$ uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+$ export OPENAI_API_KEY="sk-..."       # optional, for GPT-4o backing
+$ uv run a2a_voting_server.py
+
 You can now inspect the agent card or send a task:
 
 $ curl http://localhost:5000/.well-known/agent.json | jq
@@ -16,6 +22,7 @@ from __future__ import annotations
 import os
 from typing import Dict, List
 from python_a2a import A2AServer, run_server, skill
+import socket  # NEW: for dynamic port picking
 
 from agent_voting_system import Coordinator, Elector
 from chatgpt_agent import ChatGPTAgent
@@ -84,6 +91,24 @@ if __name__ == "__main__":
 
     agent_server = VotingCoordinatorAgent(coordinator)
 
-    # Allow custom port via env-var for container deployment
-    port = int(os.getenv("PORT", "5000"))
+    # Allow custom port via env-var; fall back to the next free one if occupied
+    def _find_free_port(start: int = 5000, limit: int = 50) -> int:
+        """Return the first free TCP port >= *start* (max *limit* ports checked)."""
+
+        for p in range(start, start + limit):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                try:
+                    sock.bind(("", p))
+                except OSError:
+                    continue  # already in use – try next
+                return p
+        raise RuntimeError("No free ports available in range.")
+
+    port_env = os.getenv("PORT")
+    base_port = int(port_env) if port_env else 5000
+    port = _find_free_port(base_port)
+
+    if port != base_port:
+        print(f"[⚠️] Port {base_port} busy – switching to {port}.")
+
     run_server(agent_server, host="0.0.0.0", port=port) 
