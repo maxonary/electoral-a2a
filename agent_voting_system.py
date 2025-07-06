@@ -1,7 +1,6 @@
-# agent_voting_system.py
-
 from typing import List, Dict
 import random
+import os
 
 class Agent:
     def __init__(self, name: str, domain: str):
@@ -9,10 +8,16 @@ class Agent:
         self.domain = domain
 
     def propose(self, task: str) -> str:
+        """Return a human-readable proposal description for the given task."""
         return f"{self.name} proposes solution for '{task}'"
 
     def vote(self, proposals: List[str]) -> str:
+        """Vote for one of the proposal descriptions. This is currently random for demo purposes."""
         return random.choice(proposals)  # Simplified voting logic
+
+    def perform(self, task: str) -> None:
+        """Placeholder for executing the assigned task once this agent wins the vote."""
+        print(f"{self.name} is now executing the task: '{task}'\n")
 
 
 class Elector:
@@ -21,50 +26,85 @@ class Elector:
         self.weight = weight
         self.agents = agents
 
-    def conduct_state_vote(self, task: str) -> Dict[str, int]:
-        proposals = [agent.propose(task) for agent in self.agents]
+    def conduct_state_vote(self, task: str) -> Dict["Agent", int]:
+        """Conduct an intra-state vote among this state's agents.
+
+        Returns a mapping of the winning *Agent* to this state's electoral weight.
+        """
+
+        # Each agent comes up with a proposal description. We keep a mapping so that we
+        # can recover the originating agent after the vote.
+        proposal_to_agent = {agent.propose(task): agent for agent in self.agents}
+
+        proposals = list(proposal_to_agent.keys())
+
+        # Each agent votes for one of the proposal descriptions.
         votes = [agent.vote(proposals) for agent in self.agents]
-        result = {}
-        for vote in votes:
-            result[vote] = result.get(vote, 0) + 1
-        # Return the winning proposal with state weight
-        winning = max(result.items(), key=lambda x: x[1])[0]
-        return {winning: self.weight}
+
+        # Count votes per proposal description
+        tally: Dict[str, int] = {}
+        for v in votes:
+            tally[v] = tally.get(v, 0) + 1
+
+        # Determine winning proposal description
+        winning_proposal = max(tally.items(), key=lambda x: x[1])[0]
+
+        winning_agent = proposal_to_agent[winning_proposal]
+
+        # Return mapping of winning agent → state weight
+        return {winning_agent: self.weight}
 
 
 class Coordinator:
     def __init__(self, electors: List[Elector]):
         self.electors = electors
 
-    def decide(self, task: str) -> str:
-        tally: Dict[str, int] = {}
-        vote_detail: Dict[str, List[str]] = {}  # For evaluation
+    def decide(self, task: str) -> "Agent":
+        """Run the electoral college voting process and return the winning *Agent*."""
+
+        tally: Dict[Agent, int] = {}
+        vote_detail: Dict[Agent, List[str]] = {}
+
         for elector in self.electors:
-            result = elector.conduct_state_vote(task)
-            for proposal, weight in result.items():
-                tally[proposal] = tally.get(proposal, 0) + weight
-                vote_detail.setdefault(proposal, []).append(elector.state_name)
+            state_result = elector.conduct_state_vote(task)
+            for agent, weight in state_result.items():
+                tally[agent] = tally.get(agent, 0) + weight
+                vote_detail.setdefault(agent, []).append(elector.state_name)
 
-        winner = max(tally.items(), key=lambda x: x[1])[0]
+        # Determine overall winner by electoral weight
+        winner_agent = max(tally.items(), key=lambda x: x[1])[0]
 
-        # Evaluation Metrics
+        # --- Evaluation metrics ---------------------------------------------------------
         total_votes = sum(tally.values())
-        consensus_ratio = tally[winner] / total_votes if total_votes else 0
-        print("\n📊 Evaluation:")
+        consensus_ratio = tally[winner_agent] / total_votes if total_votes else 0
+
+        print("Evaluation:")
         print("Total electoral votes:", total_votes)
-        print("Winning proposal:", winner)
-        print("Votes received:", tally[winner])
-        print("States supporting:", vote_detail[winner])
+        print("Winning agent:", winner_agent.name)
+        print("Votes received:", tally[winner_agent])
+        print("States supporting:", vote_detail[winner_agent])
         print("Consensus ratio:", round(consensus_ratio, 2))
 
-        return winner
+        # Delegate the task to the winning agent
+        winner_agent.perform(task)
+
+        return winner_agent
 
 
-# Example setup
 if __name__ == "__main__":
-    data_agents = [Agent(f"DataAgent{i+1}", "Data") for i in range(2)]
-    planning_agents = [Agent(f"Planner{i+1}", "Planning") for i in range(3)]
-    security_agents = [Agent(f"SecurityAgent{i+1}", "Security") for i in range(1)]
+    try:
+        # Import lazily to avoid dependency issues if OpenAI isn't installed.
+        from chatgpt_agent import ChatGPTAgent  # noqa: WPS433
+
+        _USE_GPT = bool(os.getenv("OPENAI_API_KEY"))
+    except ModuleNotFoundError:
+        _USE_GPT = False
+
+    Base = ChatGPTAgent if _USE_GPT else Agent
+
+    data_agents = [Base(f"DataAgent{i+1}", "Data") for i in range(2)]
+    planning_agents = [Base(f"Planner{i+1}", "Planning") for i in range(3)]
+    security_agents = [Base(f"SecurityAgent{i+1}", "Security") for i in range(1)]
 
     electors = [
         Elector("DataState", 5, data_agents),
@@ -73,5 +113,5 @@ if __name__ == "__main__":
     ]
 
     coordinator = Coordinator(electors)
-    final_decision = coordinator.decide("Select best infrastructure plan")
-    print("\n🏛️ Final Decision:", final_decision)
+    winning_agent = coordinator.decide("Select best infrastructure plan")
+    print("Task has been delegated to:", winning_agent.name)
