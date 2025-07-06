@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from typing import Dict, List
-from python_a2a import A2AServer, run_server, skill
+from python_a2a import A2AServer, run_server, skill, agent
 import socket  # NEW: for dynamic port picking
 
 from agent_voting_system import Coordinator, Elector
@@ -55,6 +55,7 @@ def _build_demo_coordinator() -> Coordinator:
 # ---------------------------------------------------------------------------
 
 
+@agent("ElectoralVotingCoordinator", description="Coordinator that uses a US-style electoral college among GPT-4o-backed agents to choose the single best proposal for a given task.")
 class VotingCoordinatorAgent(A2AServer):
     """Expose the `decide` method of `Coordinator` as an A2A skill."""
 
@@ -70,20 +71,20 @@ class VotingCoordinatorAgent(A2AServer):
         )
         self._coordinator = coordinator
 
-    # Define a single skill – other skills (metrics, etc.) could be added.
-    @skill(
-        name="decide_task",
-        description="Run an electoral vote and return the winning agent's answer."
-    )
-    def decide_task(self, task: str) -> Dict[str, str]:
-        """Return a structured response containing the winning agent and answer."""
+    # Main decision-making skill
+    @skill("decide_task", description="Run an electoral vote and return winner plus metrics.")
+    def decide_task(self, task: str) -> Dict[str, object]:
+        """Run an electoral vote and return winner plus metrics."""
 
-        winning_agent = self._coordinator.decide(task)
-        return {
-            "agent": winning_agent.name,
-            "domain": winning_agent.domain,
-            "task": task,
-        }
+        winner, metrics = self._coordinator.decide(task)
+        return {"agent": winner.name, "domain": winner.domain, "task": task, "metrics": metrics}
+
+    # Separate skill to fetch metrics of the most recent vote
+    @skill("last_metrics", description="Get evaluation metrics from the latest vote.")
+    def last_metrics(self) -> Dict[str, object]:
+        """Return cached metrics from the last `decide_task` invocation."""
+
+        return self._coordinator.last_metrics or {}
 
 
 if __name__ == "__main__":

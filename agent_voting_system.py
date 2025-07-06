@@ -58,8 +58,9 @@ class Elector:
 class Coordinator:
     def __init__(self, electors: List[Elector]):
         self.electors = electors
+        self.last_metrics: Dict[str, object] | None = None  # cache of last run
 
-    def decide(self, task: str) -> "Agent":
+    def decide(self, task: str) -> tuple["Agent", Dict[str, object]]:
         """Run the electoral college voting process and return the winning *Agent*."""
 
         tally: Dict[Agent, int] = {}
@@ -85,10 +86,19 @@ class Coordinator:
         print("States supporting:", vote_detail[winner_agent])
         print("Consensus ratio:", round(consensus_ratio, 2))
 
-        # Delegate the task to the winning agent
+        # Aggregate metrics into a dict for external consumption
+        metrics = {
+            "total_votes": total_votes,
+            "votes_received": tally[winner_agent],
+            "consensus_ratio": round(consensus_ratio, 2),
+            "supporting_states": vote_detail[winner_agent],
+        }
+
+        # Cache and delegate
+        self.last_metrics = metrics
         winner_agent.perform(task)
 
-        return winner_agent
+        return winner_agent, metrics
 
 
 if __name__ == "__main__":
@@ -113,5 +123,6 @@ if __name__ == "__main__":
     ]
 
     coordinator = Coordinator(electors)
-    winning_agent = coordinator.decide("Select best infrastructure plan")
+    winning_agent, metrics = coordinator.decide("Select best infrastructure plan")
     print("Task has been delegated to:", winning_agent.name)
+    print("Metrics:", metrics)
